@@ -1,0 +1,118 @@
+Sub BIA_INZ()
+
+Dim plik As Variant
+Dim importTekstu As Workbook
+Dim glownyPlik As Worksheet
+Dim komorka As Range
+Dim ostatniWiersz As Long
+
+
+
+Application.ScreenUpdating = False
+
+plik = "C:\Desktop\BIA\POMIARY.txt"
+
+
+Workbooks.OpenText _
+    Filename:=plik, _
+    startRow:=1, _
+    DataType:=xlDelimited, _
+    Comma:=True
+    
+    
+Set importTekstu = ActiveWorkbook
+
+Set glownyPlik = ThisWorkbook.Worksheets("Arkusz1")
+
+
+importTekstu.Worksheets(1).Range("A1").CurrentRegion.Copy glownyPlik.Range("A1")
+importTekstu.Close False
+Worksheets("Arkusz1").Range("B:B").NumberFormat = "@"
+        For Each glownyPlik In ThisWorkbook.Sheets
+            For Each komorka In glownyPlik.UsedRange
+                If VarType(komorka.Value) = vbString Then
+                komorka.Value = Replace(komorka.Value, ".", ",")
+                End If
+            Next komorka
+        Next glownyPlik
+        
+        
+ActiveSheet.Range("A:C").RemoveDuplicates Columns:=1, Header:=xlNo  'pozbycie sie duplikatów
+                
+
+'zamiana z tekstowego na ogólny
+Worksheets("Arkusz1").Range("B:B").NumberFormat = "General"
+Worksheets("Arkusz1").Range("D:D").NumberFormat = "General"
+
+'obliczanie Realis
+ostatniWiersz = Worksheets("Arkusz1").Cells(Rows.Count, "C").End(xlUp).Row
+Worksheets("Arkusz1").Range("D2:D" & ostatniWiersz).Formula = "=COS(C2)*B2"
+
+'obliczanie Imaginaris
+ostatniWiersz = Worksheets("Arkusz1").Cells(Rows.Count, "C").End(xlUp).Row
+Worksheets("Arkusz1").Range("E2:E" & ostatniWiersz).Formula = "=SIN(C2)*B2"
+                
+Worksheets("Arkusz1").Range("D1").Formula = "Re [ohm]"
+Worksheets("Arkusz1").Range("E1").Formula = "Iz [ohm]"
+
+'wykres
+Dim wykres As Shape
+
+Set wykres = ActiveSheet.Shapes.AddChart2
+With wykres.Chart
+    .ChartType = xlXYScatter
+    .ChartTitle.Text = "Wykres Cole-Cole"
+    .SetSourceData Source:=ActiveSheet.Range("D2:E200")
+    .Axes(xlCategory, xlPrimary).HasTitle = True
+    .Axes(xlCategory, xlPrimary).AxisTitle.Text = "Re [ohm]"
+    .Axes(xlValue, xlPrimary).HasTitle = True
+    .Axes(xlValue, xlPrimary).AxisTitle.Text = "Iz [ohm]"
+    .Axes(xlCategory).MinimumScale = 500
+    .Axes(xlValue).MinimumScale = -800
+    .Axes(xlValue).MaximumScale = 0
+End With
+
+
+'dane do RCV
+Dim newWorksheet As Worksheet
+
+Range("A:A,D:D,E:E").Select
+    Range("E1").Activate
+    Selection.Copy
+    Set newWorksheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    newWorksheet.Name = "RCV"
+    ActiveSheet.Paste
+    Range("A1:C1").Select
+    Range("C1").Activate
+    Application.CutCopyMode = False
+    Selection.ClearContents
+    Range("A1").Select
+    ActiveCell.FormulaR1C1 = "=COUNTA(R[1]C:R[999]C)"
+
+Dim rng As Range
+Dim cell As Range
+Set rng = ThisWorkbook.Sheets("RCV").UsedRange
+For Each cell In rng
+    If IsNumeric(cell.Value) Then
+        cell.Value = Val(cell.Value)
+    End If
+Next cell
+ThisWorkbook.Sheets("RCV").Range("B1").ClearContents
+ThisWorkbook.Sheets("RCV").Range("C1").ClearContents
+    
+Dim filePath As String
+filePath = "C:\Desktop\BIA\RCV.dat"
+ThisWorkbook.Sheets("RCV").Parent.SaveAs Filename:=filePath, FileFormat:=xlText
+
+MsgBox "Arkusz został zapisany jako plik .dat."
+
+
+    
+Application.ScreenUpdating = True 'znika plik kopiowany
+
+
+
+End Sub
+
+
+
